@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:aapt="http://schemas.android.com/aapt"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- Glowing outer arc segments (JARVIS Arc Reactor / AI Core) -->
+    <!-- Outer Cyan Ring -->
+    <path
+        android:strokeColor="#00F0FF"
+        android:strokeWidth="2.5"
+        android:strokeLineCap="round"
+        android:pathData="M54,54 m-30,0 a30,30 0 1,0 60,0 a30,30 0 1,0 -60,0" />
+
+    <!-- Reactor Segment Arcs -->
+    <path
+        android:strokeColor="#00B4D8"
+        android:strokeWidth="3.2"
+        android:strokeLineCap="round"
+        android:pathData="M54,20 A34,34 0 0,1 84,38" />
+    <path
+        android:strokeColor="#00B4D8"
+        android:strokeWidth="3.2"
+        android:strokeLineCap="round"
+        android:pathData="M88,54 A34,34 0 0,1 70,84" />
+    <path
+        android:strokeColor="#00B4D8"
+        android:strokeWidth="3.2"
+        android:strokeLineCap="round"
+        android:pathData="M54,88 A34,34 0 0,1 24,70" />
+    <path
+        android:strokeColor="#00B4D8"
+        android:strokeWidth="3.2"
+        android:strokeLineCap="round"
+        android:pathData="M20,54 A34,34 0 0,1 38,24" />
+
+    <!-- Inner Core Ring -->
+    <path
+        android:strokeColor="#E0F7FA"
+        android:strokeWidth="2"
+        android:pathData="M54,54 m-16,0 a16,16 0 1,0 32,0 a16,16 0 1,0 -32,0" />
+
+    <!-- Center Glowing Nucleus -->
+    <path
+        android:fillColor="#00E5FF"
+        android:pathData="M54,54 m-8,0 a8,8 0 1,0 16,0 a8,8 0 1,0 -16,0" />
+
+    <!-- Center Bright Diamond/Pulse -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M54,49 L59,54 L54,59 L49,54 Z" />
+
+    <!-- Digital Tech Ticks / Reticles -->
+    <path
+        android:strokeColor="#00F0FF"
+        android:strokeWidth="1.8"
+        android:pathData="M54,14 L54,18 M54,90 L54,94 M14,54 L18,54 M90,54 L94,54" />
+</vector>
