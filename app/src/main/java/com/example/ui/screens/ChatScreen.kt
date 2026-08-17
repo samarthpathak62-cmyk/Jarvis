@@ -373,7 +373,7 @@ fun ChatScreen(
                 }
             }
 
-            // Quick Prompt Chips
+            // Quick Prompt Chips & Automation Triggers
             if (messages.isNotEmpty()) {
                 LazyRow(
                     modifier = Modifier
@@ -382,13 +382,15 @@ fun ChatScreen(
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     val quickPrompts = listOf(
-                        "Who created you?",
-                        "What can you do?",
-                        "Help me write code",
-                        "Summarize ideas"
+                        "⚡ 5s baad YouTube kholo",
+                        "📱 Screen analyze karo",
+                        "🔍 Search on YouTube",
+                        "🤖 Who created you?",
+                        "💡 Write title & description"
                     )
                     items(quickPrompts) { prompt ->
-                        QuickChip(text = prompt, onClick = { viewModel.sendMessage(prompt) })
+                        val cleanPrompt = prompt.replace(Regex("^[⚡📱🔍🤖💡]\\s*"), "")
+                        QuickChip(text = prompt, onClick = { viewModel.sendMessage(cleanPrompt) })
                     }
                 }
             }
@@ -692,7 +694,7 @@ private fun EmptyStateWelcome(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .padding(24.dp),
+            .padding(16.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
     ) {
@@ -714,34 +716,39 @@ private fun EmptyStateWelcome(
             letterSpacing = 1.5.sp
         )
 
-        Spacer(modifier = Modifier.height(20.dp))
+        Spacer(modifier = Modifier.height(14.dp))
 
         Text(
-            text = "Tap the reactor or select a query to begin interaction.",
+            text = "Voice, device automation, & neural reasoning active.",
             color = TextDarker,
-            fontSize = 12.sp
+            fontSize = 11.sp
         )
 
-        Spacer(modifier = Modifier.height(18.dp))
+        Spacer(modifier = Modifier.height(14.dp))
 
         Column(
-            modifier = Modifier.fillMaxWidth(0.92f),
-            verticalArrangement = Arrangement.spacedBy(10.dp)
+            modifier = Modifier.fillMaxWidth(0.96f),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             PromptSuggestionCard(
-                title = "Identify Creator & Purpose",
-                prompt = "Hey JARVIS, who created you and what can you do?",
-                onClick = { onSelectPrompt("Hey JARVIS, who created you and what can you do?") }
+                title = "⚡ Time-Delayed Automation",
+                prompt = "5 second baad YouTube kholo",
+                onClick = { onSelectPrompt("5 second baad YouTube kholo") }
             )
             PromptSuggestionCard(
-                title = "Assist with Programming",
-                prompt = "Explain coroutines and flow in modern Android Jetpack Compose.",
-                onClick = { onSelectPrompt("Explain coroutines and flow in modern Android Jetpack Compose.") }
+                title = "📱 Screen Analysis",
+                prompt = "Screen analyze karo aur batao kya dikh raha hai",
+                onClick = { onSelectPrompt("Screen analyze karo aur batao kya dikh raha hai") }
             )
             PromptSuggestionCard(
-                title = "Analyze Daily Schedule",
-                prompt = "Draft an optimized high-productivity schedule for today.",
-                onClick = { onSelectPrompt("Draft an optimized high-productivity schedule for today.") }
+                title = "🔍 In-App Search",
+                prompt = "Search on YouTube: best lo-fi coding music",
+                onClick = { onSelectPrompt("Search on YouTube: best lo-fi coding music") }
+            )
+            PromptSuggestionCard(
+                title = "🤖 Creator & Identity",
+                prompt = "Who created you and what are your capabilities?",
+                onClick = { onSelectPrompt("Who created you and what are your capabilities?") }
             )
         }
     }

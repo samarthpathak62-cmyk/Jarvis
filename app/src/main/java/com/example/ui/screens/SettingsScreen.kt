@@ -458,69 +458,105 @@ fun SettingsScreen(
                     Spacer(modifier = Modifier.height(14.dp))
 
                     Text(
-                        text = "Voice Tone Profile",
+                        text = "Real Local Male Voice Engine (Python / pyttsx3 Style)",
                         color = TextPrimary,
                         fontSize = 13.sp,
                         fontWeight = FontWeight.SemiBold
                     )
+                    Text(
+                        text = "Authentic deep offline male voices with local neural tuning",
+                        color = TextMuted,
+                        fontSize = 11.sp
+                    )
 
-                    Spacer(modifier = Modifier.height(8.dp))
+                    Spacer(modifier = Modifier.height(10.dp))
 
-                    // Voice Profile selection
+                    // Voice Profile selection - Row 1
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        VoiceTonePill(
-                            label = "Calm Natural",
-                            isSelected = voiceSettings.voiceType == "calm_natural",
+                        VoiceProfileCard(
+                            title = "JARVIS British",
+                            subtitle = "🇬🇧 Iconic UK Male",
+                            isSelected = voiceSettings.voiceType == "jarvis_british_male" || voiceSettings.voiceType == "calm_british",
                             modifier = Modifier.weight(1f),
                             onClick = {
-                                val updated = voiceSettings.copy(voiceType = "calm_natural", pitch = 0.95f, speechRate = 1.0f)
+                                val updated = voiceSettings.copy(voiceType = "jarvis_british_male", pitch = 0.82f, speechRate = 0.95f)
                                 voiceSettings = updated
                                 viewModel.secureStorage.saveVoiceSettings(updated)
                                 viewModel.voiceManager.applyVoiceSettings(updated)
+                                viewModel.voiceManager.testVoice("JARVIS online, Commander. All systems calibrated.")
                             }
                         )
-                        VoiceTonePill(
-                            label = "Calm British",
-                            isSelected = voiceSettings.voiceType == "calm_british",
+                        VoiceProfileCard(
+                            title = "Python David",
+                            subtitle = "🇺🇸 pyttsx3 SAPI5",
+                            isSelected = voiceSettings.voiceType == "python_david_male" || voiceSettings.voiceType == "calm_natural",
                             modifier = Modifier.weight(1f),
                             onClick = {
-                                val updated = voiceSettings.copy(voiceType = "calm_british", pitch = 0.90f, speechRate = 0.95f)
+                                val updated = voiceSettings.copy(voiceType = "python_david_male", pitch = 0.85f, speechRate = 1.0f)
                                 voiceSettings = updated
                                 viewModel.secureStorage.saveVoiceSettings(updated)
                                 viewModel.voiceManager.applyVoiceSettings(updated)
+                                viewModel.voiceManager.testVoice("System ready. Python local audio core initialized.")
                             }
                         )
                     }
 
                     Spacer(modifier = Modifier.height(8.dp))
 
+                    // Voice Profile selection - Row 2
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        VoiceTonePill(
-                            label = "Deep Resonant",
-                            isSelected = voiceSettings.voiceType == "deep_resonant",
+                        VoiceProfileCard(
+                            title = "Deep Baritone",
+                            subtitle = "⚡ Low Bass Male",
+                            isSelected = voiceSettings.voiceType == "deep_baritone_male" || voiceSettings.voiceType == "deep_resonant",
                             modifier = Modifier.weight(1f),
                             onClick = {
-                                val updated = voiceSettings.copy(voiceType = "deep_resonant", pitch = 0.80f, speechRate = 0.95f)
+                                val updated = voiceSettings.copy(voiceType = "deep_baritone_male", pitch = 0.75f, speechRate = 0.92f)
                                 voiceSettings = updated
                                 viewModel.secureStorage.saveVoiceSettings(updated)
                                 viewModel.voiceManager.applyVoiceSettings(updated)
+                                viewModel.voiceManager.testVoice("Deep resonance active. Command interface locked.")
                             }
                         )
-                        VoiceTonePill(
-                            label = "Smooth Neutral",
-                            isSelected = voiceSettings.voiceType == "smooth_neutral",
+                        VoiceProfileCard(
+                            title = "Hinglish Male",
+                            subtitle = "🇮🇳 Prabhat / en-IN",
+                            isSelected = voiceSettings.voiceType == "hinglish_indian_male",
                             modifier = Modifier.weight(1f),
                             onClick = {
-                                val updated = voiceSettings.copy(voiceType = "smooth_neutral", pitch = 1.0f, speechRate = 1.05f)
+                                val updated = voiceSettings.copy(voiceType = "hinglish_indian_male", pitch = 0.88f, speechRate = 1.0f)
                                 voiceSettings = updated
                                 viewModel.secureStorage.saveVoiceSettings(updated)
                                 viewModel.voiceManager.applyVoiceSettings(updated)
+                                viewModel.voiceManager.testVoice("Namaste Commander. Main aapka JARVIS assistant hoon.")
+                            }
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    // Voice Profile selection - Row 3
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        VoiceProfileCard(
+                            title = "Cyber Synth",
+                            subtitle = "🤖 Robotic AI Male",
+                            isSelected = voiceSettings.voiceType == "cyber_robotic_male" || voiceSettings.voiceType == "smooth_neutral",
+                            modifier = Modifier.fillMaxWidth(),
+                            onClick = {
+                                val updated = voiceSettings.copy(voiceType = "cyber_robotic_male", pitch = 0.68f, speechRate = 0.90f)
+                                voiceSettings = updated
+                                viewModel.secureStorage.saveVoiceSettings(updated)
+                                viewModel.voiceManager.applyVoiceSettings(updated)
+                                viewModel.voiceManager.testVoice("Neural synthesizer linked. Ready for instructions.")
                             }
                         )
                     }
@@ -556,7 +592,7 @@ fun SettingsScreen(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
-                        Text(text = "Voice Pitch (Calmness)", color = TextMuted, fontSize = 12.sp)
+                        Text(text = "Voice Pitch (Deepness / Frequency)", color = TextMuted, fontSize = 12.sp)
                         Text(text = "${String.format("%.2f", voiceSettings.pitch)}x", color = CyanAtmospheric, fontSize = 12.sp, fontFamily = FontFamily.Monospace)
                     }
                     Slider(
@@ -567,7 +603,7 @@ fun SettingsScreen(
                             viewModel.secureStorage.saveVoiceSettings(updated)
                             viewModel.voiceManager.applyVoiceSettings(updated)
                         },
-                        valueRange = 0.6f..1.4f,
+                        valueRange = 0.5f..1.3f,
                         colors = SliderDefaults.colors(
                             thumbColor = CyanAtmospheric,
                             activeTrackColor = CyanAtmospheric,
@@ -578,11 +614,18 @@ fun SettingsScreen(
                     Spacer(modifier = Modifier.height(10.dp))
 
                     GlowingButton(
-                        text = "Test Calm Stock Voice",
+                        text = "🔊 Test Male Voice Preview",
                         icon = Icons.Default.PlayArrow,
                         isPrimary = false,
                         onClick = {
-                            viewModel.speakMessage("Greetings. I am JARVIS, your personal AI assistant created by Roller_gaming.")
+                            val sample = when (voiceSettings.voiceType) {
+                                "hinglish_indian_male" -> "Namaste Commander, JARVIS local male voice engine active."
+                                "deep_baritone_male", "deep_resonant" -> "JARVIS deep resonance online. All systems operational."
+                                "cyber_robotic_male" -> "Cyber synthesizer active. Standing by for command."
+                                "python_david_male", "calm_natural" -> "Python David voice initialized. Ready to assist you."
+                                else -> "Greetings Commander. I am JARVIS, created by Roller_gaming."
+                            }
+                            viewModel.voiceManager.testVoice(sample)
                         },
                         modifier = Modifier.fillMaxWidth()
                     )
@@ -591,7 +634,65 @@ fun SettingsScreen(
 
             Spacer(modifier = Modifier.height(20.dp))
 
-            // 4. Chat & Memory Management
+            // 4. Device Automation & Accessibility
+            SectionHeader(title = "DEVICE AUTOMATION", icon = Icons.Default.Security)
+            GlassCard(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(16.dp),
+                backgroundColor = AtmosphericGlass,
+                borderColor = GlassBorder
+            ) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    val isAccEnabled = viewModel.isAccessibilityEnabled()
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = "Screen Inspection & UI Control",
+                                color = TextPrimary,
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                            Text(
+                                text = if (isAccEnabled) "Service is ACTIVE. Screen reading & app controls enabled." else "Service is DISABLED. Tap below to enable in Android Settings.",
+                                color = if (isAccEnabled) StatusOnline else StatusError,
+                                fontSize = 11.sp
+                            )
+                        }
+                        Box(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(8.dp))
+                                .background(if (isAccEnabled) StatusOnline.copy(alpha = 0.15f) else StatusError.copy(alpha = 0.15f))
+                                .border(1.dp, if (isAccEnabled) StatusOnline else StatusError, RoundedCornerShape(8.dp))
+                                .padding(horizontal = 8.dp, vertical = 4.dp)
+                        ) {
+                            Text(
+                                text = if (isAccEnabled) "ENABLED" else "DISABLED",
+                                color = if (isAccEnabled) StatusOnline else StatusError,
+                                fontSize = 10.sp,
+                                fontWeight = FontWeight.Bold,
+                                fontFamily = FontFamily.Monospace
+                            )
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    GlowingButton(
+                        text = if (isAccEnabled) "Manage Accessibility Settings" else "Enable JARVIS Automation Service",
+                        isPrimary = !isAccEnabled,
+                        onClick = { viewModel.openAccessibilitySettings() },
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(20.dp))
+
+            // 5. Chat & Memory Management
             SectionHeader(title = "DATA & MEMORY", icon = Icons.Default.Delete)
             GlassCard(
                 modifier = Modifier.fillMaxWidth(),
@@ -821,6 +922,57 @@ private fun ProviderPill(
             fontSize = 13.sp,
             fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
         )
+    }
+}
+
+@Composable
+private fun VoiceProfileCard(
+    title: String,
+    subtitle: String,
+    isSelected: Boolean,
+    modifier: Modifier = Modifier,
+    onClick: () -> Unit
+) {
+    Box(
+        modifier = modifier
+            .clip(RoundedCornerShape(12.dp))
+            .background(if (isSelected) CyanCore.copy(alpha = 0.22f) else AtmosphericGlassCard)
+            .border(
+                width = if (isSelected) 1.5.dp else 1.dp,
+                color = if (isSelected) CyanAtmospheric else GlassBorder,
+                shape = RoundedCornerShape(12.dp)
+            )
+            .clickable(onClick = onClick)
+            .padding(horizontal = 12.dp, vertical = 10.dp)
+    ) {
+        Column {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text(
+                    text = title,
+                    color = if (isSelected) CyanAtmospheric else TextPrimary,
+                    fontSize = 13.sp,
+                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.SemiBold
+                )
+                if (isSelected) {
+                    Box(
+                        modifier = Modifier
+                            .size(6.dp)
+                            .clip(CircleShape)
+                            .background(CyanAtmospheric)
+                    )
+                }
+            }
+            Spacer(modifier = Modifier.height(2.dp))
+            Text(
+                text = subtitle,
+                color = if (isSelected) TextPrimary.copy(alpha = 0.8f) else TextMuted,
+                fontSize = 11.sp
+            )
+        }
     }
 }
 
