@@ -36,6 +36,9 @@ interface ChatDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertMessage(message: ChatMessageEntity): Long
 
+    @Query("UPDATE chat_messages SET content = :content, isStreaming = :isStreaming, isError = :isError WHERE id = :messageId")
+    suspend fun updateMessageContent(messageId: Long, content: String, isStreaming: Boolean, isError: Boolean)
+
     @Update
     suspend fun updateMessage(message: ChatMessageEntity)
 
