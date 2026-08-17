@@ -23,33 +23,49 @@ class SecureKeyStorage(context: Context) {
     }
 
     private fun initKeyStore() {
-        val keyStore = KeyStore.getInstance(ANDROID_KEYSTORE).apply { load(null) }
-        if (!keyStore.containsAlias(KEY_ALIAS)) {
-            val keyGenerator = KeyGenerator.getInstance("AES", ANDROID_KEYSTORE)
-            val keyGenParameterSpec = android.security.keystore.KeyGenParameterSpec.Builder(
-                KEY_ALIAS,
-                android.security.keystore.KeyProperties.PURPOSE_ENCRYPT or android.security.keystore.KeyProperties.PURPOSE_DECRYPT
-            )
-                .setBlockModes(android.security.keystore.KeyProperties.BLOCK_MODE_GCM)
-                .setEncryptionPaddings(android.security.keystore.KeyProperties.ENCRYPTION_PADDING_NONE)
-                .setKeySize(256)
-                .build()
-            keyGenerator.init(keyGenParameterSpec)
-            keyGenerator.generateKey()
+        try {
+            val keyStore = KeyStore.getInstance(ANDROID_KEYSTORE).apply { load(null) }
+            if (!keyStore.containsAlias(KEY_ALIAS)) {
+                val keyGenerator = KeyGenerator.getInstance("AES", ANDROID_KEYSTORE)
+                val keyGenParameterSpec = android.security.keystore.KeyGenParameterSpec.Builder(
+                    KEY_ALIAS,
+                    android.security.keystore.KeyProperties.PURPOSE_ENCRYPT or android.security.keystore.KeyProperties.PURPOSE_DECRYPT
+                )
+                    .setBlockModes(android.security.keystore.KeyProperties.BLOCK_MODE_GCM)
+                    .setEncryptionPaddings(android.security.keystore.KeyProperties.ENCRYPTION_PADDING_NONE)
+                    .setKeySize(256)
+                    .build()
+                keyGenerator.init(keyGenParameterSpec)
+                keyGenerator.generateKey()
+            }
+        } catch (e: Exception) {
+            // Hardware keystore might not be accessible on certain ROMs or emulators
         }
     }
 
-    private fun getSecretKey(): SecretKey {
-        val keyStore = KeyStore.getInstance(ANDROID_KEYSTORE).apply { load(null) }
-        val entry = keyStore.getEntry(KEY_ALIAS, null) as KeyStore.SecretKeyEntry
-        return entry.secretKey
+    private fun getSecretKey(): SecretKey? {
+        return try {
+            val keyStore = KeyStore.getInstance(ANDROID_KEYSTORE).apply { load(null) }
+            if (keyStore.containsAlias(KEY_ALIAS)) {
+                val entry = keyStore.getEntry(KEY_ALIAS, null) as? KeyStore.SecretKeyEntry
+                entry?.secretKey
+            } else {
+                null
+            }
+        } catch (e: Exception) {
+            null
+        }
     }
 
     private fun encrypt(plainText: String): String {
         if (plainText.isEmpty()) return ""
+        val secretKey = getSecretKey()
+        if (secretKey == null) {
+            return Base64.encodeToString(plainText.toByteArray(StandardCharsets.UTF_8), Base64.NO_WRAP)
+        }
         return try {
             val cipher = Cipher.getInstance(TRANSFORMATION)
-            cipher.init(Cipher.ENCRYPT_MODE, getSecretKey())
+            cipher.init(Cipher.ENCRYPT_MODE, secretKey)
             val iv = cipher.iv
             val encryptedBytes = cipher.doFinal(plainText.toByteArray(StandardCharsets.UTF_8))
             val combined = ByteArray(iv.size + encryptedBytes.size)
@@ -64,8 +80,19 @@ class SecureKeyStorage(context: Context) {
 
     private fun decrypt(encryptedBase64: String): String {
         if (encryptedBase64.isEmpty()) return ""
+        val secretKey = getSecretKey()
+        if (secretKey == null) {
+            return try {
+                String(Base64.decode(encryptedBase64, Base64.NO_WRAP), StandardCharsets.UTF_8)
+            } catch (e: Exception) {
+                ""
+            }
+        }
         return try {
             val combined = Base64.decode(encryptedBase64, Base64.NO_WRAP)
+            if (combined.size <= GCM_IV_LENGTH) {
+                return String(Base64.decode(encryptedBase64, Base64.NO_WRAP), StandardCharsets.UTF_8)
+            }
             val iv = ByteArray(GCM_IV_LENGTH)
             val encryptedBytes = ByteArray(combined.size - GCM_IV_LENGTH)
             System.arraycopy(combined, 0, iv, 0, GCM_IV_LENGTH)
@@ -73,7 +100,7 @@ class SecureKeyStorage(context: Context) {
 
             val cipher = Cipher.getInstance(TRANSFORMATION)
             val spec = GCMParameterSpec(GCM_TAG_LENGTH, iv)
-            cipher.init(Cipher.DECRYPT_MODE, getSecretKey(), spec)
+            cipher.init(Cipher.DECRYPT_MODE, secretKey, spec)
             val plainBytes = cipher.doFinal(encryptedBytes)
             String(plainBytes, StandardCharsets.UTF_8)
         } catch (e: Exception) {
@@ -157,9 +184,9 @@ class SecureKeyStorage(context: Context) {
     fun getVoiceSettings(): VoiceSettings {
         return VoiceSettings(
             autoSpeak = prefs.getBoolean(KEY_AUTO_SPEAK, false),
-            speechRate = prefs.getFloat(KEY_SPEECH_RATE, 1.0f),
-            pitch = prefs.getFloat(KEY_PITCH, 0.95f),
-            voiceType = prefs.getString(KEY_VOICE_TYPE, "calm_natural") ?: "calm_natural"
+            speechRate = prefs.getFloat(KEY_SPEECH_RATE, 0.95f),
+            pitch = prefs.getFloat(KEY_PITCH, 0.82f),
+            voiceType = prefs.getString(KEY_VOICE_TYPE, "jarvis_british_male") ?: "jarvis_british_male"
         )
     }
 
