@@ -1,3 +1,5 @@
 <resources>
     <string name="app_name">JARVIS</string>
+    <string name="accessibility_service_label">JARVIS Automation Service</string>
+    <string name="accessibility_service_description">Enables JARVIS AI to assist with permission-based device automation, screen analysis, reading visible UI elements, and app navigation.</string>
 </resources>
