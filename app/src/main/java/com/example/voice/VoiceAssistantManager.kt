@@ -3,6 +3,8 @@ package com.example.voice
 import android.content.Context
 import android.content.Intent
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
 import android.speech.RecognitionListener
 import android.speech.RecognizerIntent
 import android.speech.SpeechRecognizer
@@ -24,6 +26,7 @@ class VoiceAssistantManager(
     private val scope: CoroutineScope
 ) : RecognitionListener, TextToSpeech.OnInitListener {
 
+    private val mainHandler = Handler(Looper.getMainLooper())
     private var speechRecognizer: SpeechRecognizer? = null
     private var tts: TextToSpeech? = null
     private var isTtsInitialized = false
@@ -44,50 +47,68 @@ class VoiceAssistantManager(
     private var currentVoiceSettings = VoiceSettings()
 
     init {
-        initSpeechRecognizer()
-        initTextToSpeech()
+        mainHandler.post {
+            initSpeechRecognizer()
+            initTextToSpeech()
+        }
     }
 
     private fun initSpeechRecognizer() {
-        if (SpeechRecognizer.isRecognitionAvailable(context)) {
-            speechRecognizer = SpeechRecognizer.createSpeechRecognizer(context).apply {
-                setRecognitionListener(this@VoiceAssistantManager)
+        try {
+            if (SpeechRecognizer.isRecognitionAvailable(context)) {
+                speechRecognizer?.destroy()
+                speechRecognizer = SpeechRecognizer.createSpeechRecognizer(context).apply {
+                    setRecognitionListener(this@VoiceAssistantManager)
+                }
             }
+        } catch (e: Exception) {
+            Log.w("VoiceAssistantManager", "SpeechRecognizer not initialized: ${e.message}")
+            speechRecognizer = null
         }
     }
 
     private fun initTextToSpeech() {
-        tts = TextToSpeech(context.applicationContext, this)
+        try {
+            tts = TextToSpeech(context.applicationContext, this)
+        } catch (e: Exception) {
+            Log.w("VoiceAssistantManager", "TTS initialization failed: ${e.message}")
+            tts = null
+        }
     }
 
     override fun onInit(status: Int) {
         if (status == TextToSpeech.SUCCESS) {
             isTtsInitialized = true
-            tts?.language = Locale.US
-            applyVoiceSettings(currentVoiceSettings)
-            tts?.setOnUtteranceProgressListener(object : UtteranceProgressListener() {
-                override fun onStart(utteranceId: String?) {
-                    scope.launch(Dispatchers.Main) {
-                        _isSpeaking.value = true
+            try {
+                tts?.language = Locale.US
+                applyVoiceSettings(currentVoiceSettings)
+                tts?.setOnUtteranceProgressListener(object : UtteranceProgressListener() {
+                    override fun onStart(utteranceId: String?) {
+                        scope.launch(Dispatchers.Main) {
+                            _isSpeaking.value = true
+                        }
                     }
-                }
 
-                override fun onDone(utteranceId: String?) {
-                    scope.launch(Dispatchers.Main) {
-                        _isSpeaking.value = false
-                        _audioRms.value = 0f
+                    override fun onDone(utteranceId: String?) {
+                        scope.launch(Dispatchers.Main) {
+                            _isSpeaking.value = false
+                            _audioRms.value = 0f
+                        }
                     }
-                }
 
-                override fun onError(utteranceId: String?) {
-                    scope.launch(Dispatchers.Main) {
-                        _isSpeaking.value = false
-                        _audioRms.value = 0f
+                    override fun onError(utteranceId: String?) {
+                        scope.launch(Dispatchers.Main) {
+                            _isSpeaking.value = false
+                            _audioRms.value = 0f
+                        }
                     }
-                }
-            })
+                })
+            } catch (e: Exception) {
+                Log.w("VoiceAssistantManager", "Error setting up TTS listeners: ${e.message}")
+            }
         } else {
-            Log.e("VoiceAssistantManager", "TTS init failed with status: $status")
+            Log.w("VoiceAssistantManager", "TTS init failed with status: $status")
+            isTtsInitialized = false
         }
     }
 
@@ -95,32 +116,21 @@ class VoiceAssistantManager(
         currentVoiceSettings = settings
         if (!isTtsInitialized || tts == null) return
 
-        tts?.setPitch(settings.pitch)
-        tts?.setSpeechRate(settings.speechRate)
-
         try {
+            tts?.setPitch(settings.pitch)
+            tts?.setSpeechRate(settings.speechRate)
+
             val availableVoices = tts?.voices
             if (!availableVoices.isNullOrEmpty()) {
-                val targetVoice = when (settings.voiceType) {
-                    "calm_british" -> {
-                        availableVoices.find { it.locale.country == "GB" && !it.isNetworkConnectionRequired }
-                            ?: availableVoices.find { it.locale.country == "GB" }
-                    }
-                    "deep_resonant" -> {
-                        availableVoices.find { it.name.contains("male", ignoreCase = true) || it.name.contains("en-us-x-sfg") }
-                    }
-                    "smooth_neutral" -> {
-                        availableVoices.find { it.locale.language == "en" && it.quality >= Voice.QUALITY_NORMAL }
-                    }
-                    else -> { // "calm_natural"
-                        availableVoices.find { it.locale == Locale.US && !it.isNetworkConnectionRequired }
-                    }
-                }
-
+                val targetVoice = findBestMaleVoice(settings.voiceType, availableVoices)
                 if (targetVoice != null) {
                     tts?.voice = targetVoice
                 } else {
-                    tts?.language = Locale.US
+                    when (settings.voiceType) {
+                        "jarvis_british_male", "calm_british" -> tts?.language = Locale.UK
+                        "hinglish_indian_male" -> tts?.language = Locale("en", "IN")
+                        else -> tts?.language = Locale.US
+                    }
                 }
             }
         } catch (e: Exception) {
@@ -128,61 +138,138 @@ class VoiceAssistantManager(
         }
     }
 
+    private fun findBestMaleVoice(voiceType: String, voices: Set<Voice>): Voice? {
+        val maleVoiceKeywords = listOf("male", "rjs", "gbd", "sfg", "tpf", "cxx", "end", "iol", "fis", "david", "george", "guy", "mark")
+        val femaleVoiceKeywords = listOf("female", "woman", "girl", "zira", "eva", "jenny", "sfg#female", "tpf#female", "cxx#female", "aria")
+
+        val isMaleCandidate: (Voice) -> Boolean = { v ->
+            val lower = v.name.lowercase(Locale.ROOT)
+            val hasMaleKeyword = maleVoiceKeywords.any { lower.contains(it) }
+            val hasFemaleKeyword = femaleVoiceKeywords.any { lower.contains(it) }
+            (hasMaleKeyword || !hasFemaleKeyword)
+        }
+
+        return when (voiceType) {
+            "jarvis_british_male", "calm_british" -> {
+                // Priority: British English Male Local -> British Male Network -> Any British
+                voices.filter { it.locale.country.equals("GB", ignoreCase = true) || it.locale.language.equals("en", ignoreCase = true) && it.locale.country.equals("GB", ignoreCase = true) }
+                    .sortedWith(compareByDescending<Voice> { !it.isNetworkConnectionRequired }
+                        .thenByDescending { isMaleCandidate(it) }
+                        .thenByDescending { it.name.contains("rjs", ignoreCase = true) || it.name.contains("gbd", ignoreCase = true) || it.name.contains("male", ignoreCase = true) })
+                    .firstOrNull()
+            }
+            "python_david_male", "calm_natural" -> {
+                // Priority: US English Male Local (pyttsx3 SAPI5 David style)
+                voices.filter { it.locale.country.equals("US", ignoreCase = true) || it.locale == Locale.US }
+                    .sortedWith(compareByDescending<Voice> { !it.isNetworkConnectionRequired }
+                        .thenByDescending { isMaleCandidate(it) }
+                        .thenByDescending { it.name.contains("sfg", ignoreCase = true) || it.name.contains("tpf", ignoreCase = true) || it.name.contains("male", ignoreCase = true) })
+                    .firstOrNull()
+            }
+            "deep_baritone_male", "deep_resonant" -> {
+                // Priority: Deepest resonant male voice across US / GB
+                voices.filter { it.locale.language.equals("en", ignoreCase = true) }
+                    .sortedWith(compareByDescending<Voice> { !it.isNetworkConnectionRequired }
+                        .thenByDescending { it.name.contains("male", ignoreCase = true) }
+                        .thenByDescending { isMaleCandidate(it) })
+                    .firstOrNull()
+            }
+            "hinglish_indian_male" -> {
+                // Priority: Indian English / Hinglish Male Local (Prabhat/en-IN style)
+                voices.filter { it.locale.country.equals("IN", ignoreCase = true) || it.locale.language.equals("hi", ignoreCase = true) }
+                    .sortedWith(compareByDescending<Voice> { !it.isNetworkConnectionRequired }
+                        .thenByDescending { isMaleCandidate(it) }
+                        .thenByDescending { it.name.contains("cxx", ignoreCase = true) || it.name.contains("end", ignoreCase = true) || it.name.contains("male", ignoreCase = true) })
+                    .firstOrNull() ?: voices.find { it.locale.country.equals("IN", ignoreCase = true) }
+            }
+            "cyber_robotic_male" -> {
+                // Priority: Any clean local voice, will apply sub-bass pitch
+                voices.filter { it.locale.language.equals("en", ignoreCase = true) && !it.isNetworkConnectionRequired }
+                    .sortedByDescending { isMaleCandidate(it) }
+                    .firstOrNull()
+            }
+            else -> {
+                // General Male Fallback
+                voices.filter { it.locale.language.equals("en", ignoreCase = true) }
+                    .sortedWith(compareByDescending<Voice> { !it.isNetworkConnectionRequired }
+                        .thenByDescending { isMaleCandidate(it) })
+                    .firstOrNull()
+            }
+        }
+    }
+
+    fun testVoice(sampleText: String = "JARVIS neural audio online. Commander, all local systems calibrated.") {
+        speak(sampleText)
+    }
+
     fun startListening(onResult: (String) -> Unit) {
         stopSpeaking()
         onSpeechResultCallback = onResult
         _recognizedText.value = ""
 
-        if (speechRecognizer == null) {
-            initSpeechRecognizer()
-        }
+        mainHandler.post {
+            try {
+                if (speechRecognizer == null) {
+                    initSpeechRecognizer()
+                }
 
-        val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
-            putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
-            putExtra(RecognizerIntent.EXTRA_LANGUAGE, Locale.getDefault())
-            putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true)
-            putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 1)
-        }
+                val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
+                    putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
+                    putExtra(RecognizerIntent.EXTRA_LANGUAGE, Locale.getDefault())
+                    putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true)
+                    putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 1)
+                }
 
-        try {
-            speechRecognizer?.startListening(intent)
-            _isListening.value = true
-        } catch (e: Exception) {
-            Log.e("VoiceAssistantManager", "Error starting speech recognition", e)
-            _isListening.value = false
+                speechRecognizer?.startListening(intent)
+                _isListening.value = true
+            } catch (e: Exception) {
+                Log.e("VoiceAssistantManager", "Error starting speech recognition", e)
+                _isListening.value = false
+            }
         }
     }
 
     fun stopListening() {
-        try {
-            speechRecognizer?.stopListening()
-        } catch (e: Exception) {
-            Log.e("VoiceAssistantManager", "Error stopping speech recognition", e)
+        mainHandler.post {
+            try {
+                speechRecognizer?.stopListening()
+            } catch (e: Exception) {
+                Log.w("VoiceAssistantManager", "Error stopping speech recognition: ${e.message}")
+            }
+            _isListening.value = false
+            _audioRms.value = 0f
         }
-        _isListening.value = false
-        _audioRms.value = 0f
     }
 
     fun speak(text: String) {
         if (!isTtsInitialized || tts == null || text.isBlank()) return
         stopSpeaking()
 
-        // Clean markdown formatting for smoother vocalization
-        val cleanText = text
-            .replace(Regex("[#*_`\\[\\]()]"), "")
-            .replace(Regex("```[\\s\\S]*?```"), "code block omitted.")
-            .trim()
+        try {
+            // Clean markdown formatting for smoother vocalization
+            val cleanText = text
+                .replace(Regex("[#*_`\\[\\]()]"), "")
+                .replace(Regex("```[\\s\\S]*?```"), "code block omitted.")
+                .trim()
 
-        val params = Bundle().apply {
-            putString(TextToSpeech.Engine.KEY_PARAM_UTTERANCE_ID, "jarvis_speech_${System.currentTimeMillis()}")
+            val utteranceId = "jarvis_speech_${System.currentTimeMillis()}"
+            val params = Bundle().apply {
+                putString(TextToSpeech.Engine.KEY_PARAM_UTTERANCE_ID, utteranceId)
+            }
+
+            tts?.speak(cleanText, TextToSpeech.QUEUE_FLUSH, params, utteranceId)
+        } catch (e: Exception) {
+            Log.e("VoiceAssistantManager", "Error speaking text", e)
         }
-
-        tts?.speak(cleanText, TextToSpeech.QUEUE_FLUSH, params, "jarvis_speech_${System.currentTimeMillis()}")
     }
 
     fun stopSpeaking() {
-        if (tts != null && isTtsInitialized) {
-            tts?.stop()
+        try {
+            if (tts != null && isTtsInitialized) {
+                tts?.stop()
+            }
+        } catch (e: Exception) {
+            Log.w("VoiceAssistantManager", "Error stopping TTS: ${e.message}")
         }
         _isSpeaking.value = false
         _audioRms.value = 0f
@@ -191,7 +278,9 @@ class VoiceAssistantManager(
     // --- SpeechRecognizer Callbacks ---
 
     override fun onReadyForSpeech(params: Bundle?) {
-        _isListening.value = true
+        scope.launch(Dispatchers.Main) {
+            _isListening.value = true
+        }
     }
 
     override fun onBeginningOfSpeech() {}
@@ -205,42 +294,59 @@ class VoiceAssistantManager(
     override fun onBufferReceived(buffer: ByteArray?) {}
 
     override fun onEndOfSpeech() {
-        _isListening.value = false
+        scope.launch(Dispatchers.Main) {
+            _isListening.value = false
+        }
     }
 
     override fun onError(error: Int) {
-        _isListening.value = false
-        _audioRms.value = 0f
+        scope.launch(Dispatchers.Main) {
+            _isListening.value = false
+            _audioRms.value = 0f
+        }
         Log.w("VoiceAssistantManager", "Speech recognition error code: $error")
     }
 
     override fun onResults(results: Bundle?) {
-        _isListening.value = false
-        val matches = results?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
-        val text = matches?.firstOrNull() ?: ""
-        if (text.isNotBlank()) {
-            _recognizedText.value = text
-            onSpeechResultCallback?.invoke(text)
+        scope.launch(Dispatchers.Main) {
+            _isListening.value = false
+            val matches = results?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
+            val text = matches?.firstOrNull() ?: ""
+            if (text.isNotBlank()) {
+                _recognizedText.value = text
+                onSpeechResultCallback?.invoke(text)
+            }
         }
     }
 
     override fun onPartialResults(partialResults: Bundle?) {
-        val matches = partialResults?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
-        val text = matches?.firstOrNull() ?: ""
-        if (text.isNotBlank()) {
-            _recognizedText.value = text
+        scope.launch(Dispatchers.Main) {
+            val matches = partialResults?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
+            val text = matches?.firstOrNull() ?: ""
+            if (text.isNotBlank()) {
+                _recognizedText.value = text
+            }
         }
     }
 
     override fun onEvent(eventType: Int, params: Bundle?) {}
 
     fun release() {
-        try {
-            speechRecognizer?.destroy()
-            tts?.stop()
-            tts?.shutdown()
-        } catch (e: Exception) {
-            Log.e("VoiceAssistantManager", "Error releasing voice resources", e)
+        mainHandler.post {
+            try {
+                speechRecognizer?.destroy()
+                speechRecognizer = null
+            } catch (e: Exception) {
+                Log.w("VoiceAssistantManager", "Error destroying speech recognizer: ${e.message}")
+            }
+            try {
+                tts?.stop()
+                tts?.shutdown()
+                tts = null
+                isTtsInitialized = false
+            } catch (e: Exception) {
+                Log.w("VoiceAssistantManager", "Error shutting down TTS: ${e.message}")
+            }
         }
     }
 }
