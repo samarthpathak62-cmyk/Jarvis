@@ -78,16 +78,7 @@ class ChatRepository(private val chatDao: ChatDao) {
         isStreaming: Boolean,
         isError: Boolean = false
     ) {
-        val msg = ChatMessageEntity(
-            id = messageId,
-            sessionId = 0, // Not used in query directly but entity requires id
-            sender = "assistant",
-            content = content,
-            timestamp = System.currentTimeMillis(),
-            isStreaming = isStreaming,
-            isError = isError
-        )
-        chatDao.updateMessage(msg)
+        chatDao.updateMessageContent(messageId, content, isStreaming, isError)
     }
 
     suspend fun deleteSession(sessionId: Long) {
