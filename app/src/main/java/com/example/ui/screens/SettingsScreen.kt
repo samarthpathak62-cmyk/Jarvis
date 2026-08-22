@@ -458,18 +458,35 @@ fun SettingsScreen(
                     Spacer(modifier = Modifier.height(14.dp))
 
                     Text(
-                        text = "Real Local Male Voice Engine (Python / pyttsx3 Style)",
+                        text = "Real Local Male Voice Engine (Realistic & Expressive)",
                         color = TextPrimary,
                         fontSize = 13.sp,
                         fontWeight = FontWeight.SemiBold
                     )
                     Text(
-                        text = "Authentic deep offline male voices with local neural tuning",
+                        text = "Authentic deep offline British-Hinglish voice with realistic laughter and emotion",
                         color = TextMuted,
                         fontSize = 11.sp
                     )
 
                     Spacer(modifier = Modifier.height(10.dp))
+
+                    // Featured Voice: Expressive British Hinglish (with Laughter)
+                    VoiceProfileCard(
+                        title = "✨ Expressive British-Hinglish",
+                        subtitle = "🇬🇧 Iconic UK + Real Laughter & Emotion",
+                        isSelected = voiceSettings.voiceType == "expressive_british_hinglish",
+                        modifier = Modifier.fillMaxWidth(),
+                        onClick = {
+                            val updated = voiceSettings.copy(voiceType = "expressive_british_hinglish", pitch = 0.85f, speechRate = 0.94f)
+                            voiceSettings = updated
+                            viewModel.secureStorage.saveVoiceSettings(updated)
+                            viewModel.voiceManager.applyVoiceSettings(updated)
+                            viewModel.voiceManager.testVoice("Haha! Greetings Commander. Main aapka JARVIS hoon, all systems ready.")
+                        }
+                    )
+
+                    Spacer(modifier = Modifier.height(8.dp))
 
                     // Voice Profile selection - Row 1
                     Row(
@@ -558,6 +575,43 @@ fun SettingsScreen(
                                 viewModel.voiceManager.applyVoiceSettings(updated)
                                 viewModel.voiceManager.testVoice("Neural synthesizer linked. Ready for instructions.")
                             }
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(14.dp))
+
+                    // Realistic Laughter & Emotion Switch
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = "Realistic Laughter Simulation (ChatGPT / Gemini style)",
+                                color = TextPrimary,
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                            Text(
+                                text = "Synthesizes expressive laughter cues, chuckles and pitch modulation",
+                                color = TextMuted,
+                                fontSize = 10.sp
+                            )
+                        }
+                        Switch(
+                            checked = voiceSettings.enableLaughterSimulation,
+                            onCheckedChange = {
+                                val updated = voiceSettings.copy(enableLaughterSimulation = it)
+                                voiceSettings = updated
+                                viewModel.secureStorage.saveVoiceSettings(updated)
+                                viewModel.voiceManager.applyVoiceSettings(updated)
+                            },
+                            colors = SwitchDefaults.colors(
+                                checkedThumbColor = AtmosphericDarkSurface,
+                                checkedTrackColor = CyanAtmospheric,
+                                uncheckedTrackColor = AtmosphericGlassCard
+                            )
                         )
                     }
 

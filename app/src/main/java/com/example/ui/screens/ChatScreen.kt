@@ -69,6 +69,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -110,6 +111,7 @@ fun ChatScreen(
 ) {
     val context = LocalContext.current
     val focusManager = LocalFocusManager.current
+    val keyboardController = LocalSoftwareKeyboardController.current
     val listState = rememberLazyListState()
 
     val messages by viewModel.messages.collectAsState()
@@ -268,17 +270,17 @@ fun ChatScreen(
                 }
             }
 
-            // Compact Central Holographic Orb HUD Header
-            Box(
+            // Central Holographic Orb HUD Header + Live Deck
+            Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(vertical = 4.dp),
-                contentAlignment = Alignment.Center
+                    .padding(vertical = 2.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 FuturisticOrb(
                     state = orbState,
                     audioRms = audioRms,
-                    size = if (messages.isEmpty()) 130.dp else 68.dp,
+                    size = if (messages.isEmpty()) 120.dp else 64.dp,
                     onClick = {
                         if (isSpeaking) {
                             viewModel.stopSpeaking()
@@ -297,6 +299,99 @@ fun ChatScreen(
                         }
                     }
                 )
+
+                // Quick Hardware Telemetry & Automation Deck (Collapsible HUD)
+                val battery by viewModel.batteryTelemetry.collectAsState()
+                val memory by viewModel.memoryTelemetry.collectAsState()
+                val isTorchOn by viewModel.isTorchOn.collectAsState()
+                val isAccActive by viewModel.isAccessibilityOnline.collectAsState()
+
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 4.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    // Battery telemetry badge
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(AtmosphericGlassCard)
+                            .border(1.dp, GlassBorder, RoundedCornerShape(8.dp))
+                            .clickable { viewModel.sendMessage("Battery status report") }
+                            .padding(horizontal = 8.dp, vertical = 4.dp)
+                    ) {
+                        Text(
+                            text = "🔋 ${battery.level}% ${if (battery.isCharging) "⚡" else ""}",
+                            color = if (battery.level > 20) StatusOnline else StatusError,
+                            fontSize = 11.sp,
+                            fontFamily = FontFamily.Monospace,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+
+                    // RAM telemetry badge
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(AtmosphericGlassCard)
+                            .border(1.dp, GlassBorder, RoundedCornerShape(8.dp))
+                            .clickable { viewModel.sendMessage("Device memory status") }
+                            .padding(horizontal = 8.dp, vertical = 4.dp)
+                    ) {
+                        Text(
+                            text = "🧠 RAM ${memory.availableRamMb}M",
+                            color = CyanAtmospheric,
+                            fontSize = 11.sp,
+                            fontFamily = FontFamily.Monospace,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+
+                    // Flashlight 1-Tap Toggle
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(if (isTorchOn) CyanAtmospheric.copy(alpha = 0.25f) else AtmosphericGlassCard)
+                            .border(1.dp, if (isTorchOn) CyanAtmospheric else GlassBorder, RoundedCornerShape(8.dp))
+                            .clickable { viewModel.toggleTorch() }
+                            .padding(horizontal = 8.dp, vertical = 4.dp)
+                    ) {
+                        Text(
+                            text = if (isTorchOn) "🔦 TORCH ON" else "🔦 TORCH OFF",
+                            color = if (isTorchOn) CyanAtmospheric else TextMuted,
+                            fontSize = 11.sp,
+                            fontFamily = FontFamily.Monospace,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+
+                    // Automation Service Doctor Badge
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(if (isAccActive) StatusOnline.copy(alpha = 0.15f) else StatusError.copy(alpha = 0.2f))
+                            .border(1.dp, if (isAccActive) StatusOnline.copy(alpha = 0.5f) else StatusError, RoundedCornerShape(8.dp))
+                            .clickable {
+                                if (!isAccActive) {
+                                    viewModel.openAccessibilitySettings()
+                                    Toast.makeText(context, "Enable 'JARVIS Automation Service' in Settings", Toast.LENGTH_LONG).show()
+                                } else {
+                                    viewModel.sendMessage("Screen analyze karo")
+                                }
+                            }
+                            .padding(horizontal = 8.dp, vertical = 4.dp)
+                    ) {
+                        Text(
+                            text = if (isAccActive) "🤖 AUTO: ON" else "⚠️ AUTO: FIX",
+                            color = if (isAccActive) StatusOnline else StatusError,
+                            fontSize = 11.sp,
+                            fontFamily = FontFamily.Monospace,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                }
             }
 
             // Voice Listening Live Transcript Overlay
@@ -382,14 +477,17 @@ fun ChatScreen(
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     val quickPrompts = listOf(
-                        "⚡ 5s baad YouTube kholo",
+                        "🔦 Flashlight on",
+                        "🔋 Battery report",
+                        "😂 Ek mast joke sunao",
+                        "🌅 Morning briefing",
+                        "🎮 Gaming mode",
                         "📱 Screen analyze karo",
-                        "🔍 Search on YouTube",
-                        "🤖 Who created you?",
-                        "💡 Write title & description"
+                        "⚡ 5s baad YouTube kholo",
+                        "🤖 Who created you?"
                     )
                     items(quickPrompts) { prompt ->
-                        val cleanPrompt = prompt.replace(Regex("^[⚡📱🔍🤖💡]\\s*"), "")
+                        val cleanPrompt = prompt.replace(Regex("^[🔦🔋😂🌅🎮📱⚡🤖]\\s*"), "")
                         QuickChip(text = prompt, onClick = { viewModel.sendMessage(cleanPrompt) })
                     }
                 }
@@ -456,14 +554,14 @@ fun ChatScreen(
                                 fontSize = 14.sp
                             )
                         },
-                        singleLine = false,
-                        maxLines = 4,
+                        singleLine = true,
                         keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
                         keyboardActions = KeyboardActions(onSend = {
                             if (textInput.isNotBlank() && !isGenerating) {
-                                viewModel.sendMessage(textInput)
+                                val text = textInput.trim()
                                 textInput = ""
                                 focusManager.clearFocus()
+                                viewModel.sendMessage(text)
                             }
                         }),
                         colors = OutlinedTextFieldDefaults.colors(
@@ -482,9 +580,10 @@ fun ChatScreen(
                     IconButton(
                         onClick = {
                             if (textInput.isNotBlank() && !isGenerating) {
-                                viewModel.sendMessage(textInput)
+                                val text = textInput.trim()
                                 textInput = ""
                                 focusManager.clearFocus()
+                                viewModel.sendMessage(text)
                             }
                         },
                         enabled = textInput.isNotBlank() && !isGenerating,
