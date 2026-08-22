@@ -29,10 +29,11 @@ data class UserProfile(
 )
 
 data class VoiceSettings(
-    val autoSpeak: Boolean = false,
+    val autoSpeak: Boolean = true,
     val speechRate: Float = 0.95f,
-    val pitch: Float = 0.82f,
-    val voiceType: String = "jarvis_british_male" // jarvis_british_male, python_david_male, deep_baritone_male, hinglish_indian_male, cyber_robotic_male
+    val pitch: Float = 0.85f,
+    val voiceType: String = "expressive_british_hinglish", // expressive_british_hinglish, jarvis_british_male, python_david_male, deep_baritone_male, hinglish_indian_male, cyber_robotic_male
+    val enableLaughterSimulation: Boolean = true
 )
 
 enum class OrbState {
@@ -41,3 +42,45 @@ enum class OrbState {
     THINKING,
     SPEAKING
 }
+
+data class MacroStep(
+    val title: String,
+    val actionType: String,
+    val target: String? = null,
+    val input: String? = null,
+    val delaySeconds: Long = 0L
+)
+
+data class MacroRoutine(
+    val id: String,
+    val title: String,
+    val subtitle: String,
+    val iconName: String,
+    val steps: List<MacroStep>
+)
+
+data class ScheduledTaskItem(
+    val id: String,
+    val title: String,
+    val target: String,
+    val totalSeconds: Long,
+    val remainingSeconds: Long,
+    val status: String = "PENDING"
+)
+
+data class BatteryTelemetry(
+    val percentage: Int,
+    val isCharging: Boolean,
+    val temperatureCelsius: Float,
+    val health: String,
+    val level: Int = percentage
+)
+
+data class MemoryTelemetry(
+    val usedRamMb: Long,
+    val totalRamMb: Long,
+    val ramPercent: Int,
+    val freeStorageGb: Float,
+    val totalStorageGb: Float,
+    val availableRamMb: Long = (totalRamMb - usedRamMb).coerceAtLeast(0)
+)
