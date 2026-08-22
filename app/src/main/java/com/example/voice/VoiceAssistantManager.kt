@@ -127,7 +127,7 @@ class VoiceAssistantManager(
                     tts?.voice = targetVoice
                 } else {
                     when (settings.voiceType) {
-                        "jarvis_british_male", "calm_british" -> tts?.language = Locale.UK
+                        "expressive_british_hinglish", "jarvis_british_male", "calm_british" -> tts?.language = Locale.UK
                         "hinglish_indian_male" -> tts?.language = Locale("en", "IN")
                         else -> tts?.language = Locale.US
                     }
@@ -139,7 +139,7 @@ class VoiceAssistantManager(
     }
 
     private fun findBestMaleVoice(voiceType: String, voices: Set<Voice>): Voice? {
-        val maleVoiceKeywords = listOf("male", "rjs", "gbd", "sfg", "tpf", "cxx", "end", "iol", "fis", "david", "george", "guy", "mark")
+        val maleVoiceKeywords = listOf("male", "rjs", "gbd", "sfg", "tpf", "cxx", "end", "iol", "fis", "david", "george", "guy", "mark", "prabhat")
         val femaleVoiceKeywords = listOf("female", "woman", "girl", "zira", "eva", "jenny", "sfg#female", "tpf#female", "cxx#female", "aria")
 
         val isMaleCandidate: (Voice) -> Boolean = { v ->
@@ -150,6 +150,17 @@ class VoiceAssistantManager(
         }
 
         return when (voiceType) {
+            "expressive_british_hinglish" -> {
+                // Priority: British Male -> Indian English Male -> US Male
+                voices.filter { it.locale.country.equals("GB", ignoreCase = true) || it.locale.language.equals("en", ignoreCase = true) && it.locale.country.equals("GB", ignoreCase = true) }
+                    .sortedWith(compareByDescending<Voice> { !it.isNetworkConnectionRequired }
+                        .thenByDescending { isMaleCandidate(it) }
+                        .thenByDescending { it.name.contains("rjs", ignoreCase = true) || it.name.contains("gbd", ignoreCase = true) || it.name.contains("male", ignoreCase = true) })
+                    .firstOrNull() ?: voices.filter { it.locale.country.equals("IN", ignoreCase = true) }
+                        .sortedWith(compareByDescending<Voice> { !it.isNetworkConnectionRequired }
+                            .thenByDescending { isMaleCandidate(it) })
+                        .firstOrNull()
+            }
             "jarvis_british_male", "calm_british" -> {
                 // Priority: British English Male Local -> British Male Network -> Any British
                 voices.filter { it.locale.country.equals("GB", ignoreCase = true) || it.locale.language.equals("en", ignoreCase = true) && it.locale.country.equals("GB", ignoreCase = true) }
@@ -198,7 +209,7 @@ class VoiceAssistantManager(
         }
     }
 
-    fun testVoice(sampleText: String = "JARVIS neural audio online. Commander, all local systems calibrated.") {
+    fun testVoice(sampleText: String = "Haha, greetings Commander! JARVIS neural audio online. British Hinglish expressive synthesis active.") {
         speak(sampleText)
     }
 
@@ -246,21 +257,82 @@ class VoiceAssistantManager(
         stopSpeaking()
 
         try {
-            // Clean markdown formatting for smoother vocalization
-            val cleanText = text
-                .replace(Regex("[#*_`\\[\\]()]"), "")
-                .replace(Regex("```[\\s\\S]*?```"), "code block omitted.")
-                .trim()
+            // Clean markdown formatting & prepare expressive phonetic text
+            val processedText = prepareExpressiveSpeech(text)
 
             val utteranceId = "jarvis_speech_${System.currentTimeMillis()}"
             val params = Bundle().apply {
                 putString(TextToSpeech.Engine.KEY_PARAM_UTTERANCE_ID, utteranceId)
             }
 
-            tts?.speak(cleanText, TextToSpeech.QUEUE_FLUSH, params, utteranceId)
+            // Check if text has laughter cues
+            if (currentVoiceSettings.enableLaughterSimulation && containsLaughter(text)) {
+                // Modulate pitch slightly for expressive laughter burst, then speak
+                tts?.setPitch((currentVoiceSettings.pitch * 1.08f).coerceAtMost(1.3f))
+                tts?.speak(processedText, TextToSpeech.QUEUE_FLUSH, params, utteranceId)
+                // Reset pitch back to baseline on UI handler shortly
+                mainHandler.postDelayed({
+                    tts?.setPitch(currentVoiceSettings.pitch)
+                }, 800)
+            } else {
+                tts?.setPitch(currentVoiceSettings.pitch)
+                tts?.speak(processedText, TextToSpeech.QUEUE_FLUSH, params, utteranceId)
+            }
         } catch (e: Exception) {
             Log.e("VoiceAssistantManager", "Error speaking text", e)
         }
+    }
+
+    private fun containsLaughter(raw: String): Boolean {
+        val lower = raw.lowercase(Locale.ROOT)
+        return lower.contains("haha") || lower.contains("hehe") || lower.contains("chuckle") ||
+               lower.contains("😂") || lower.contains("😆") || lower.contains("🤣") || lower.contains("lol") ||
+               lower.contains("lmao") || lower.contains("rofl") ||
+               lower.contains("[laughs]") || lower.contains("*laughs*") || lower.contains("*chuckles*") ||
+               lower.contains("(laughs)") || lower.contains("(chuckles)") || lower.contains("*giggles*")
+    }
+
+    private fun prepareExpressiveSpeech(raw: String): String {
+        var text = raw
+            // Strip code blocks and raw markdown symbols
+            .replace(Regex("```[\\s\\S]*?```"), "Code block omitted.")
+            .replace(Regex("[#*`\\[\\]()]"), " ")
+            .replace("⚡", "")
+            .replace("🤖", "")
+            .replace("🚀", "")
+            .replace("🔋", "")
+            .replace("🔦", "")
+            .replace("💡", "")
+
+        // Convert laughter cues to expressive phonetics with natural rhythmic punctuation
+        if (currentVoiceSettings.enableLaughterSimulation) {
+            text = text
+                .replace(Regex("(?i)\\b(ha){3,}\\b"), "Ha, ha, ha! ")
+                .replace(Regex("(?i)\\b(he){3,}\\b"), "Heh, heh, heh! ")
+                .replace(Regex("(?i)\\[laughs\\]|\\*laughs\\*|\\*chuckles\\*|\\(laughs\\)|\\(chuckles\\)|\\*giggles\\*"), "Aha! Ha-ha! ")
+                .replace(Regex("(?i)\\bhaha\\b"), "Ha-ha! ")
+                .replace(Regex("(?i)\\bhehe\\b"), "Heh-heh! ")
+                .replace("😂", " Ha-ha! ")
+                .replace("🤣", " Ha-ha-ha! ")
+                .replace("😆", " Heh-heh! ")
+        }
+
+        // Optimize common Hinglish phrases for clear, authentic British-Hinglish delivery
+        text = text
+            .replace(Regex("(?i)\\bbhai\\b"), "bhai")
+            .replace(Regex("(?i)\\bbhaiya\\b"), "bhaiya")
+            .replace(Regex("(?i)\\byaar\\b"), "yaar")
+            .replace(Regex("(?i)\\bshukriya\\b"), "Shook-riya")
+            .replace(Regex("(?i)\\bkholo\\b"), "kholo")
+            .replace(Regex("(?i)\\bdekho\\b"), "dekho")
+            .replace(Regex("(?i)\\bshaandaar\\b"), "shaan-daar")
+            .replace(Regex("(?i)\\bzaroor\\b"), "za-roor")
+            .replace(Regex("(?i)\\bbilkul\\b"), "bil-kul")
+            .replace(Regex("(?i)\\bnahi\\b"), "na-hi")
+            .replace(Regex("(?i)\\btheek\\b"), "theek")
+            .replace(Regex("(?i)\\bachha\\b"), "accha")
+
+        return text.trim()
     }
 
     fun stopSpeaking() {
