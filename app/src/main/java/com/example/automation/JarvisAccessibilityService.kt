@@ -141,7 +141,12 @@ class JarvisAccessibilityService : AccessibilityService() {
     }
 
     fun triggerGlobalAction(actionCode: Int): Boolean {
-        return performGlobalAction(actionCode)
+        return try {
+            performGlobalAction(actionCode)
+        } catch (e: Exception) {
+            Log.e(TAG, "Error performing global action $actionCode", e)
+            false
+        }
     }
 
     companion object {
@@ -155,18 +160,25 @@ class JarvisAccessibilityService : AccessibilityService() {
         fun isAccessibilityEnabled(context: Context): Boolean {
             if (isServiceRunning && getInstance() != null) return true
             val expectedServiceName = "${context.packageName}/${JarvisAccessibilityService::class.java.name}"
+            val shortServiceName = "${context.packageName}/.automation.JarvisAccessibilityService"
             val enabledServices = Settings.Secure.getString(
                 context.contentResolver,
                 Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES
             ) ?: return false
-            return enabledServices.split(":").any { it.equals(expectedServiceName, ignoreCase = true) }
+            return enabledServices.split(":").any {
+                it.equals(expectedServiceName, ignoreCase = true) || it.equals(shortServiceName, ignoreCase = true)
+            }
         }
 
         fun openAccessibilitySettings(context: Context) {
-            val intent = Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS).apply {
-                flags = Intent.FLAG_ACTIVITY_NEW_TASK
+            try {
+                val intent = Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS).apply {
+                    flags = Intent.FLAG_ACTIVITY_NEW_TASK
+                }
+                context.startActivity(intent)
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to open accessibility settings", e)
             }
-            context.startActivity(intent)
         }
     }
 }
