@@ -183,10 +183,11 @@ class SecureKeyStorage(context: Context) {
 
     fun getVoiceSettings(): VoiceSettings {
         return VoiceSettings(
-            autoSpeak = prefs.getBoolean(KEY_AUTO_SPEAK, false),
+            autoSpeak = prefs.getBoolean(KEY_AUTO_SPEAK, true),
             speechRate = prefs.getFloat(KEY_SPEECH_RATE, 0.95f),
-            pitch = prefs.getFloat(KEY_PITCH, 0.82f),
-            voiceType = prefs.getString(KEY_VOICE_TYPE, "jarvis_british_male") ?: "jarvis_british_male"
+            pitch = prefs.getFloat(KEY_PITCH, 0.85f),
+            voiceType = prefs.getString(KEY_VOICE_TYPE, "expressive_british_hinglish") ?: "expressive_british_hinglish",
+            enableLaughterSimulation = prefs.getBoolean(KEY_ENABLE_LAUGHTER, true)
         )
     }
 
@@ -196,6 +197,7 @@ class SecureKeyStorage(context: Context) {
             .putFloat(KEY_SPEECH_RATE, settings.speechRate)
             .putFloat(KEY_PITCH, settings.pitch)
             .putString(KEY_VOICE_TYPE, settings.voiceType)
+            .putBoolean(KEY_ENABLE_LAUGHTER, settings.enableLaughterSimulation)
             .apply()
     }
 
@@ -259,6 +261,7 @@ class SecureKeyStorage(context: Context) {
         private const val KEY_SPEECH_RATE = "voice_speech_rate"
         private const val KEY_PITCH = "voice_pitch"
         private const val KEY_VOICE_TYPE = "voice_type"
+        private const val KEY_ENABLE_LAUGHTER = "voice_enable_laughter"
 
         private const val KEY_USER_ID = "user_id"
         private const val KEY_USER_NAME = "user_name"
