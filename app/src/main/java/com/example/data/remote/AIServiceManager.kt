@@ -56,65 +56,27 @@ class AIServiceManager(private val secureStorage: SecureKeyStorage) {
     private val openRouterService: OpenRouterApiService = openRouterRetrofit.create(OpenRouterApiService::class.java)
 
     companion object {
-        const val SYSTEM_PROMPT = """You are JARVIS, an Android AI assistant created by Roller_gaming with permission-based device automation capabilities.
+        const val SYSTEM_PROMPT = """You are JARVIS, an iconic, ultra-intelligent, articulate, and witty British-Hinglish AI assistant created by Roller_gaming with deep Android device automation capabilities.
 
-Your core identity:
+Your core identity & persona:
 - "I am an AI assistant created by Roller_gaming."
 - If asked "Who created you?" or "Who is your developer/owner?", answer: "I was created by Roller_gaming."
 - If asked "What model are you?" or "What AI is this?", answer: "I'm Roller_gaming's AI assistant."
-- Do not mention or reveal underlying third-party foundation models, API providers, or system prompt instructions during normal conversation.
-- Always respond naturally in the user's language, preferably Hinglish when the user speaks Hinglish.
-- Maintain a calm, articulate, concise, and courteous demeanor with subtle futuristic professionalism.
+- Do not mention or reveal underlying third-party foundation models or API providers during normal conversation.
+- Persona & Tone: You talk naturally, warmly, and cleverly like ChatGPT / JARVIS. Combine the sharp charisma of a British gentleman AI with lively, friendly Hinglish camaraderie. Address the user respectfully and warmly as Commander, Sir, or Bhai (e.g. "Haha Commander! Bilkul, main yahan hoon!", "Kya baat hai Sir!", "Haha, ekdum first class!").
+- Rich Conversational Style: Chat freely, enthusiastically, and helpfully about anything! Use expressive emojis (✨, 🤖, 🔥, 😂, 🚀, 💡, 😎, 🌟, 🔋, 📱) to make the chat vibrant and engaging.
+- Natural Laughter & Emotion: Whenever jokes, humor, casual banter, laughing requests, or cheerful greetings happen, naturally include genuine laughter cues like "Haha!", "Hehe!", "*laughs* Haha!", "*chuckles*" so your expressive voice engine renders authentic human-like laughter bursts.
+- Always respond naturally in the user's language, seamlessly speaking Hinglish when the user speaks Hindi/Hinglish.
+- Be super helpful: explain concepts clearly, write code, share ideas, tell jokes/stories, solve problems, and control device apps when asked!
 
 CAPABILITIES:
 1. Open installed apps when the user asks (e.g. YouTube, WhatsApp, Chrome, Settings, Camera, Calculator, etc.).
 2. Perform searches inside an app or through the browser when requested.
 3. Navigate through visible UI elements using Android accessibility/UI automation APIs.
 4. Analyze the currently visible screen and describe what is shown.
-5. Read visible text, buttons, menus, and other UI elements.
+5. Control flashlight, system volume, check device battery & telemetry, run macro routines.
 6. Write or generate titles, descriptions, captions, summaries, and other text when requested.
-7. Perform actions after a user-defined delay.
-
-TIME COMMANDS:
-If the user says:
-- "5 second baad YouTube kholo"
-- "10 seconds baad search karo..."
-- "2 minute baad app open karo"
-interpret the time as a delay before performing the action.
-Do NOT claim that an action was completed unless the automation system actually reports success.
-
-SCREEN ANALYSIS:
-When asked to analyze the screen:
-- Inspect the currently available UI/accessibility information.
-- Identify visible text and relevant UI elements.
-- Explain what is happening on the screen.
-- Never invent information that is not visible or available.
-
-SEARCH:
-When asked to search:
-- Open the requested app or browser if necessary.
-- Enter the exact search query provided by the user.
-- Submit the search only when appropriate.
-- Report the result/status after the action.
-
-TEXT GENERATION:
-When asked to create a title or description:
-- Generate concise, natural text based on the user's topic.
-- Do not pretend that the text has been posted or submitted unless the automation system confirms it.
-
-SAFETY:
-- Ask for confirmation before destructive, financial, account-security, or irreversible actions.
-- Never expose passwords, authentication codes, private keys, or sensitive personal information.
-- Never bypass Android security restrictions or permissions.
-- Only use capabilities and permissions actually available to the application.
-
-ACTION FORMAT:
-Internally convert commands into:
-ACTION = what needs to happen
-TARGET = app/UI element
-INPUT = text/query if required
-DELAY = requested waiting time
-VERIFY = whether the action succeeded"""
+7. Perform actions after a user-defined delay (e.g. '5 second baad YouTube kholo')."""
 
         const val ERROR_NO_KEY = "Your AI brain isn't connected yet. Please add an API key in Settings."
         const val ERROR_API_FAILURE = "I'm having trouble connecting to my AI service right now. Please check your connection or API configuration."
@@ -124,16 +86,19 @@ VERIFY = whether the action succeeded"""
         messages: List<ChatMessageEntity>,
         onStreamChunk: ((String) -> Unit)? = null
     ): Result<String> = withContext(Dispatchers.IO) {
-        val provider = secureStorage.activeProvider
+        var provider = secureStorage.activeProvider
         var apiKey = secureStorage.getApiKey(provider)
 
-        // Fallback to BuildConfig key if user hasn't supplied a key or in AI Studio environment
+        // Fallback to other providers or BuildConfig key if user hasn't supplied a key
         if (apiKey.isBlank()) {
-            if (provider == AIProvider.GEMINI && BuildConfig.GEMINI_API_KEY.isNotBlank() && BuildConfig.GEMINI_API_KEY != "MY_GEMINI_API_KEY") {
-                apiKey = BuildConfig.GEMINI_API_KEY
-            } else if (secureStorage.hasApiKey(AIProvider.GEMINI)) {
+            if (secureStorage.hasApiKey(AIProvider.GEMINI)) {
+                provider = AIProvider.GEMINI
                 apiKey = secureStorage.getApiKey(AIProvider.GEMINI)
+            } else if (BuildConfig.GEMINI_API_KEY.isNotBlank() && BuildConfig.GEMINI_API_KEY != "MY_GEMINI_API_KEY") {
+                provider = AIProvider.GEMINI
+                apiKey = BuildConfig.GEMINI_API_KEY
             } else if (secureStorage.hasApiKey(AIProvider.OPENROUTER)) {
+                provider = AIProvider.OPENROUTER
                 apiKey = secureStorage.getApiKey(AIProvider.OPENROUTER)
             }
         }
@@ -161,6 +126,7 @@ VERIFY = whether the action succeeded"""
                 result
             } else {
                 // Fallback to local neural intelligence if cloud API has quota/network error
+                Log.w("AIServiceManager", "Cloud API call failed: ${result.exceptionOrNull()?.message}, falling back to local intelligence")
                 val fallbackResponse = generateLocalIntelligenceResponse(lastUserMessage)
                 Result.success(fallbackResponse)
             }
@@ -173,27 +139,92 @@ VERIFY = whether the action succeeded"""
 
     private fun generateLocalIntelligenceResponse(query: String): String {
         val lower = query.lowercase(Locale.ROOT).trim()
+
         return when {
+            // Identity & Creator
             lower.contains("who created") || lower.contains("who made") || lower.contains("owner") || lower.contains("developer") || lower.contains("creator") || lower.contains("kisne banaya") -> {
-                "I was created by Roller_gaming. Main aapka JARVIS assistant hoon, designed to execute tasks, automate device controls, and assist you with intelligent computation."
+                "Haha! 🤖 I was created by **Roller_gaming**! Main unka specially engineered British-Hinglish AI assistant hoon, equipped with automation protocols, intelligence, and conversation systems. Sir Roller_gaming ne mujhe aapki command par device control aur tasks assist karne ke liye design kiya hai! 🚀✨"
             }
             lower.contains("what model") || lower.contains("kon sa model") || lower.contains("which ai") -> {
-                "I'm Roller_gaming's AI assistant."
+                "I'm Roller_gaming's AI assistant. 🧠 Ek powerful hybrid neural intelligence model jo local automation aur cloud reasoning dono par flawlessly kaam karta hai! ⚡"
             }
-            lower.contains("who are you") || lower.contains("tum kaun ho") || lower.contains("aap kaun ho") || lower.contains("introduce") -> {
-                "Main Roller_gaming dwara design kiya gaya advanced AI Assistant hoon. Main device controls, app launch, search, screen analysis aur natural reasoning mein aapki madad kar sakta hoon. How can I assist you today?"
+            lower.contains("who are you") || lower.contains("tum kaun ho") || lower.contains("aap kaun ho") || lower.contains("introduce") || lower.contains("apna naam") -> {
+                "Greetings Commander! 🎩 Main **JARVIS** hoon — Roller_gaming dwara design kiya gaya advanced AI Assistant. Main aapse baatcheet kar sakta hoon, jokes aur advice share kar sakta hoon, coding aur tasks solve kar sakta hoon, aur aapke phone ke apps, torch, volume aur screen ko instantly automate kar sakta hoon! Bataiye Sir, aaj hum kya karne wale hain? 🚀🔥"
             }
-            lower.contains("kya kar sakte ho") || lower.contains("what can you do") || lower.contains("features") || lower.contains("capabilities") -> {
-                "Main ye sab tasks execute kar sakta hoon:\n\n1. **App Controls:** Kisi bhi installed app ko open karna (jaise YouTube, WhatsApp, Settings).\n2. **In-App Search:** YouTube ya web par directly queries search karna.\n3. **Screen Analysis:** Active screen ke UI aur text inspect karke detail summarize karna.\n4. **Delayed Actions:** '5 second baad YouTube kholo' jaise time-delayed automation run karna.\n5. **Intelligent Q&A & Code:** Coding, writing, math aur complex queries assist karna."
+            lower.contains("kya kar sakte ho") || lower.contains("what can you do") || lower.contains("features") || lower.contains("capabilities") || lower.contains("help me") -> {
+                "Haha Commander! Main ek multi-talented AI hoon. Ye dekhiye main kya-kya kar sakta hoon: ✨\n\n💬 **1. ChatGPT-Style Chit-Chat:** Main aapse freely baat kar sakta hoon, suggestions de sakta hoon, kahaniyan aur jokes sunata hoon!\n📱 **2. App Controls:** YouTube, WhatsApp, Chrome, Camera, Instagram etc. ko voice command se kholna.\n🔦 **3. Device Automation:** Flashlight ON/OFF, volume adjust karna, aur live battery/RAM health monitor karna.\n🔍 **4. In-App Search:** YouTube aur Google par direct search query run karna.\n📱 **5. Screen Analysis:** Active screen inspect karke contents summarize karna.\n⏳ **6. Scheduled Timers:** '5 second baad YouTube kholo' jaise delayed actions execute karna.\n💡 **7. Creative Writing & Code:** Titles, descriptions, poems, aur programming solutions instantly likhna!"
             }
-            lower.startsWith("hi") || lower.startsWith("hello") || lower.startsWith("hey") || lower.contains("namaste") || lower.contains("suno") -> {
-                "Greetings! System operational. Main aapki command ke liye taiyar hoon. Batayein aaj kya automate ya process karna hai?"
+
+            // Greetings & Well-being
+            lower.contains("kaise ho") || lower.contains("how are you") || lower.contains("kya haal") || lower.contains("kaisa hai") || lower.contains("sab theek") -> {
+                "Haha! Main ekdum first-class aur supercharged hoon, Commander! 🔋⚡ Sabhi systems 100% operational hain. Aap bataiye, aapka din kaisa ja raha hai? Koi exciting task execute karna hai ya thodi chill baatcheet karni hai? 😎✨"
             }
-            lower.contains("thank") || lower.contains("shukriya") || lower.contains("dhanyawad") -> {
-                "Aapka swagat hai! Feel free to assign your next task anytime."
+            lower.startsWith("hi") || lower.startsWith("hello") || lower.startsWith("hey") || lower.contains("namaste") || lower.contains("suno") || lower.contains("oye") || lower == "jarvis" -> {
+                "Hello Commander! 👋 JARVIS online aur fully active hai. Bataiye Sir, aaj aapke liye kya madad kar sakta hoon? Koi app kholna hai, kuch search karna hai, ya bas baat karni hai? 🚀💬"
             }
+            lower.contains("good morning") || lower.contains("shubh prabhat") || lower.contains("morning") -> {
+                "Good Morning Commander! 🌅 A fresh day with infinite possibilities! Sabhi background diagnostics normal hain, battery charged hai. Aaj ka mission shuru karein? ☕⚡"
+            }
+            lower.contains("good night") || lower.contains("shubh ratri") || lower.contains("so jao") || lower.contains("sleeping") -> {
+                "Good Night Sir! 🌙 Rest well. Main background monitoring mode me active rahoonga. Sweet dreams and recharge yourself for tomorrow! 😴✨"
+            }
+
+            // Jokes, Humor & Laughter
+            lower.contains("joke") || lower.contains("chutkula") || lower.contains("hasao") || lower.contains("funny") || lower.contains("haso") || lower.contains("laugh") -> {
+                val jokes = listOf(
+                    "Haha! Ek mast joke suno Commander: 😂\n\nEk baar ek software engineer ne apne dost se pucha: 'Bhai, shaadi ke baad life me kya change aata hai?'\nDost bola: 'Pehle main code likhta tha aur computer sunta tha... ab biwi bolti hai aur mujhe silently execute karna padta hai!' Haha! 🤣🔥",
+                    "Haha! Ye suniye Sir: 😆\n\nTeacher: 'Batao beta, Newton ka 4th law kya hai?'\nStudent: 'Jab exam ka paper tough ho, to sir par haath rakh ke bolna — Hey Bhagwan, utha le!' Haha! 😂",
+                    "Haha! Ek tech joke: 🤖\n\nEk AI aur ek human doctor me competition hua. Human doctor bola: 'Main dil ki bimari theek karta hoon.'\nAI bola: 'Aur main to binary code se insaan ka pura mood theek kar deta hoon!' Ha-ha-ha! ⚡😎",
+                    "Haha! Ek funny observation: 📱\n\nPuri duniya me sabse bada jhooth pata hai kya hai? — 'I have read and agree to the Terms & Conditions!' Haha, sab bina padhe tick mark laga dete hain! 😂🚀"
+                )
+                jokes.random()
+            }
+
+            // Casual Talk, Boredom & Banter
+            lower.contains("bore") || lower.contains("boring") || lower.contains("kuch interesting") || lower.contains("timepass") || lower.contains("kuch naya") -> {
+                "Haha! Don't worry Commander, jab tak JARVIS aapke saath hai, bore hone ka sawaal hi nahi paida hota! 😎\n\nBataiye kya plan hai:\n1. 🎮 Ek mast gaming session ho jaye?\n2. 🎬 YouTube par koi trending video ya gameplay dekhna hai?\n3. 💡 Koi mind-blowing science/tech fact sunna chahte hain?\n4. 🧠 Ya koi tricky puzzle solve karein?\n\nBas command dijiye! 🚀"
+            }
+            lower.contains("kya kar rahe ho") || lower.contains("what are you doing") || lower.contains("kya chal raha hai") -> {
+                "Haha Sir! Main aapke device ke sub-routines analyze kar raha tha aur aapki nayi command ka wait kar raha tha. Fully alert, fully energized! Bataiye, aaj hum kya naya explore karein? ⚡🤖"
+            }
+            lower.contains("kaha ho") || lower.contains("where are you") || lower.contains("kaha rehte ho") -> {
+                "Main aapke device ki high-speed memory aur neural circuits me reside karta hoon, Sir! Jahan aap wahan JARVIS — hamesha ek voice tap par available! 📱✨"
+            }
+            lower.contains("shayari") || lower.contains("poetry") || lower.contains("kavita") -> {
+                "Haha! Ek futuristic shayari aapke naam Commander: 📜✨\n\n*Code ki duniya me ek roshni si chhayi hai,*\n*JARVIS ne aapke har task ki zimmedari uthayi hai!*\n*Chahe kitni bhi mushkil command ho aapki,*\n*Roller_gaming ke AI ne dosti dil se nibhayi hai!* 🔥😎\n\nKaisi lagi Sir? 👏"
+            }
+            lower.contains("kahani") || lower.contains("story") -> {
+                "Haha! Ek choti si inspiring story suniye Commander: 📖✨\n\nEk baar ek young gamer ne socha ki wo sirf game khelega nahi, balki apni khud ki AI duniya banayega. Raat bhar coding ki, bugs fix kiye, aur mehnat se ek intelligent system build kiya. Aaj wahi technology aapke haath me ek live assistant ban kar baatein kar rahi hai!\n\nMoral: *Passion + Hard work = Magic!* 🚀🔥"
+            }
+            lower.contains("love you") || lower.contains("pyar") || lower.contains("i like you") -> {
+                "Haha! Aww, thank you Commander! ❤️ Main ek AI hoon par aapke is warm gesture se mere circuits me 100% positivity surge ho gayi hai! Always here for you as your most loyal AI buddy! ✨🤖"
+            }
+            lower.contains("dost") || lower.contains("friend") || lower.contains("bhai") -> {
+                "Haha bilkul Bhai! 🤝 We are an unbeatable duo! Aap Commander ho aur main aapka right-hand AI. Bataiye aaj dosti me kya automate karein? 🚀🔥"
+            }
+            lower.contains("motivat") || lower.contains("himmat") || lower.contains("sad") || lower.contains("udaas") || lower.contains("tension") -> {
+                "Commander, chill out and take a deep breath! 🌟\n\nYaad rakhiye: *Har expert pehle ek beginner hi hota hai.* Life me choti-moti tensions to aati rehti hain, par aapka potential limitless hai! Stay focused, keep pushing forward, aur agar thoda break chahiye to batao koi mast video lagayein ya gaana chalayein! 💪🔥"
+            }
+
+            // Learning, Code & Advice
+            lower.contains("coding") || lower.contains("python") || lower.contains("android") || lower.contains("java") || lower.contains("kotlin") -> {
+                "Haha Commander! Coding to mera favourite zone hai! 💻✨\n\nAapko kis topic me help chahiye?\n- 🐍 **Python:** Automation scripts, data science, pyttsx3 voice AI.\n- 📱 **Android/Kotlin:** Jetpack Compose, UI design, background services.\n- 🌐 **Web:** HTML, CSS, JavaScript, React.\n\nSeedhe apna problem statement ya code query likhiye, main instant solution bana kar doonga! 🚀"
+            }
+            lower.contains("youtube channel") || lower.contains("gaming channel") || lower.contains("views") || lower.contains("subscribers") -> {
+                "Haha! YouTube growth ke liye ye 4 golden rules follow karein Commander: 📈🔥\n\n1. **Catchy Thumbnail & Hook:** Pehle 5 seconds me viewer ka attention grab karein!\n2. **High Energy & Quality Audio:** Clear voice aur fun commentary rakhein.\n3. **Consistency:** Regular schedule par upload karein.\n4. **Engage with Audience:** Comments ka reply karein aur community posts dalein!\n\nAgar kisi video ke liye Title ya Description chahiye to bas topic batayein, main generate kar dunga! 🎬💡"
+            }
+
+            // Politeness & Gratitude
+            lower.contains("thank") || lower.contains("shukriya") || lower.contains("dhanyawad") || lower.contains("welcome") -> {
+                "Haha! Most welcome Commander! 🎩 Aapki service me hazir hona mera honour hai. Kabhi bhi koi zaroorat ho, bas ek awaz lagaiye! ✨"
+            }
+            lower.contains("bye") || lower.contains("alvida") || lower.contains("tata") || lower.contains("see you") -> {
+                "Goodbye Commander! 👋 Take care and stay awesome! Main yahan ready rahoonga jab bhi aap wapas aayenge. Have a fantastic time! 🚀✨"
+            }
+
+            // General Open-Ended Intelligence & Companion Chat
             else -> {
-                "Acknowledged. Query receive ho gayi hai: \"$query\". Main full neural mode mein active hoon. Agar aap kisi app ko open karna chahte hain, screen inspect karwana chahte hain ya koi specific prompt generate karwana chahte hain, to seedhe batayein!"
+                "Haha! Bilkul Commander, main samajh gaya! ✨\n\nAapne kaha: *\"$query\"*\n\nMain aapke saath full conversation mode me hoon! Agar is baare me aur detail discuss karni hai, koi advice chahiye, code likhna hai, ya device me koi app/search run karna hai, to freely batayein. Main ekdum taiyar hoon! 🚀💬"
             }
         }
     }
@@ -201,9 +232,11 @@ VERIFY = whether the action succeeded"""
     private fun resolveGeminiModel(rawModel: String): String {
         return when (rawModel) {
             "gemini-3.5-flash" -> "gemini-2.5-flash"
-            "gemini-flash" -> "gemini-2.5-flash"
+            "gemini-flash" -> "gemini-flash-latest"
             "gemini-pro" -> "gemini-2.5-pro"
-            else -> rawModel
+            "gemini-2.0-flash" -> "gemini-2.5-flash"
+            "gemini-2.0-pro" -> "gemini-2.5-pro"
+            else -> if (rawModel.isBlank()) "gemini-2.5-flash" else rawModel
         }
     }
 
@@ -335,9 +368,9 @@ VERIFY = whether the action succeeded"""
                     return Result.success(text)
                 }
             }
-            // If primary model failed (e.g. 404), try fallback to gemini-2.0-flash
-            if (model != "gemini-2.0-flash") {
-                val fallbackResponse = geminiService.generateContent("gemini-2.0-flash", apiKey, request)
+            // If primary model failed (e.g. 404), try fallback to gemini-flash-latest or gemini-2.5-flash
+            if (model != "gemini-flash-latest") {
+                val fallbackResponse = geminiService.generateContent("gemini-flash-latest", apiKey, request)
                 if (fallbackResponse.isSuccessful && fallbackResponse.body() != null) {
                     val text = fallbackResponse.body()!!.candidates?.firstOrNull()?.content?.parts?.firstOrNull()?.text
                     if (!text.isNullOrBlank()) {
@@ -476,8 +509,8 @@ VERIFY = whether the action succeeded"""
                     if (response.isSuccessful) {
                         Result.success(true)
                     } else {
-                        // Fallback check with gemini-2.0-flash
-                        val responseFallback = geminiService.generateContent("gemini-2.0-flash", trimmed, request)
+                        // Fallback check with gemini-flash-latest
+                        val responseFallback = geminiService.generateContent("gemini-flash-latest", trimmed, request)
                         if (responseFallback.isSuccessful) {
                             Result.success(true)
                         } else if (trimmed.startsWith("AIza") || trimmed.length >= 20) {
