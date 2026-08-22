@@ -19,6 +19,7 @@ import com.example.data.remote.AIServiceManager
 import com.example.data.repository.ChatRepository
 import com.example.data.security.SecureKeyStorage
 import com.example.voice.VoiceAssistantManager
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -72,7 +73,7 @@ class JarvisViewModel(application: Application) : AndroidViewModel(application) 
 
     val availableModels = listOf(
         ModelOption("gemini-2.5-flash", "Gemini 2.5 Flash (Fast)", AIProvider.GEMINI, "Ultra-fast response with high reasoning"),
-        ModelOption("gemini-2.0-flash", "Gemini 2.0 Flash (Fast)", AIProvider.GEMINI, "High-speed reasoning companion"),
+        ModelOption("gemini-flash-latest", "Gemini Flash Latest", AIProvider.GEMINI, "Latest high-speed reasoning model"),
         ModelOption("gemini-2.5-pro", "Gemini 2.5 Pro (Advanced)", AIProvider.GEMINI, "Complex tasks, coding, deep STEM"),
         ModelOption("gemini-3.1-pro-preview", "Gemini 3.1 Pro (Preview)", AIProvider.GEMINI, "Next-gen reasoning preview"),
         ModelOption("gemini-3.1-flash-lite-preview", "Gemini 3.1 Flash Lite", AIProvider.GEMINI, "Lightweight efficient companion"),
@@ -98,12 +99,16 @@ class JarvisViewModel(application: Application) : AndroidViewModel(application) 
                         val newId = chatRepository.createNewSession("Initial System Boot")
                         _currentSessionId.value = newId
                         loadMessages(newId)
-                    } else if (_currentSessionId.value == 1L && list.isNotEmpty()) {
+                    } else if (_currentSessionId.value == 1L && list.none { it.id == 1L }) {
                         val firstId = list.first().id
                         _currentSessionId.value = firstId
                         loadMessages(firstId)
+                    } else if (_messages.value.isEmpty()) {
+                        loadMessages(_currentSessionId.value)
                     }
                 }
+            } catch (e: CancellationException) {
+                // Expected when scope is cancelled
             } catch (e: Exception) {
                 android.util.Log.e("JarvisViewModel", "Error in initSession", e)
             }
@@ -117,6 +122,8 @@ class JarvisViewModel(application: Application) : AndroidViewModel(application) 
                 chatRepository.getMessagesForSession(sessionId).collect { msgList ->
                     _messages.value = msgList
                 }
+            } catch (e: CancellationException) {
+                // Expected when switching sessions or canceling previous message collector job
             } catch (e: Exception) {
                 android.util.Log.e("JarvisViewModel", "Error loading messages for session: $sessionId", e)
             }
@@ -244,6 +251,62 @@ class JarvisViewModel(application: Application) : AndroidViewModel(application) 
         }
     }
 
+    private val _batteryTelemetry = MutableStateFlow(automationManager.getBatteryTelemetry())
+    val batteryTelemetry: StateFlow<com.example.data.model.BatteryTelemetry> = _batteryTelemetry.asStateFlow()
+
+    private val _memoryTelemetry = MutableStateFlow(automationManager.getMemoryTelemetry())
+    val memoryTelemetry: StateFlow<com.example.data.model.MemoryTelemetry> = _memoryTelemetry.asStateFlow()
+
+    private val _isTorchOn = MutableStateFlow(automationManager.getFlashlightState())
+    val isTorchOn: StateFlow<Boolean> = _isTorchOn.asStateFlow()
+
+    private val _isAccessibilityOnline = MutableStateFlow(automationManager.getAccessibilityStatus())
+    val isAccessibilityOnline: StateFlow<Boolean> = _isAccessibilityOnline.asStateFlow()
+
+    fun refreshTelemetry() {
+        _batteryTelemetry.value = automationManager.getBatteryTelemetry()
+        _memoryTelemetry.value = automationManager.getMemoryTelemetry()
+        _isTorchOn.value = automationManager.getFlashlightState()
+        _isAccessibilityOnline.value = automationManager.getAccessibilityStatus()
+    }
+
+    fun toggleTorch() {
+        val res = automationManager.toggleFlashlight()
+        _isTorchOn.value = automationManager.getFlashlightState()
+        if (secureStorage.getVoiceSettings().autoSpeak) {
+            voiceManager.speak(if (_isTorchOn.value) "Flashlight turned on." else "Flashlight turned off.")
+        }
+    }
+
+    fun setSystemVolume(percent: Int) {
+        automationManager.setVolumePercent(percent)
+    }
+
+    fun runMacroRoutine(macroId: String) {
+        viewModelScope.launch {
+            _isGenerating.value = true
+            _statusText.value = "EXECUTING MACRO: $macroId..."
+            val result = automationManager.executeMacro(macroId) { progress ->
+                _statusText.value = progress
+            }
+            _isGenerating.value = false
+            _statusText.value = "ONLINE // READY"
+            refreshTelemetry()
+
+            // Save execution report in chat
+            val msgId = chatRepository.addMessage(
+                sessionId = _currentSessionId.value,
+                sender = "assistant",
+                content = result.message,
+                isStreaming = false,
+                isError = !result.success
+            )
+            if (secureStorage.getVoiceSettings().autoSpeak) {
+                voiceManager.speak(result.message)
+            }
+        }
+    }
+
     private suspend fun handleDeviceAutomation(
         command: ParsedCommand,
         assistantMsgId: Long,
@@ -286,7 +349,14 @@ class JarvisViewModel(application: Application) : AndroidViewModel(application) 
                 return
             }
 
-            AutomationActionType.OPEN_APP, AutomationActionType.SEARCH, AutomationActionType.GLOBAL_NAV -> {
+            AutomationActionType.OPEN_APP,
+            AutomationActionType.SEARCH,
+            AutomationActionType.GLOBAL_NAV,
+            AutomationActionType.FLASHLIGHT,
+            AutomationActionType.VOLUME,
+            AutomationActionType.TELEMETRY,
+            AutomationActionType.MACRO_ROUTINE,
+            AutomationActionType.SYSTEM_SETTINGS -> {
                 if (command.delaySeconds > 0) {
                     _statusText.value = "DELAY TIMER ACTIVE (${command.delaySeconds}s)..."
                     chatRepository.updateMessageContent(
@@ -310,9 +380,10 @@ class JarvisViewModel(application: Application) : AndroidViewModel(application) 
                 chatRepository.updateMessageContent(assistantMsgId, responseText, isStreaming = false, isError = !autoResult.success)
                 _isGenerating.value = false
                 _statusText.value = "ONLINE // READY"
+                refreshTelemetry()
 
                 if (secureStorage.getVoiceSettings().autoSpeak) {
-                    voiceManager.speak(if (autoResult.success) "${command.target ?: "Action"} complete kar diya gaya hai." else "Action perform nahi ho paya.")
+                    voiceManager.speak(if (autoResult.success) "${command.target ?: "Action"} complete kar diya gaya hai, sir." else "Action perform nahi ho paya.")
                 }
                 return
             }
